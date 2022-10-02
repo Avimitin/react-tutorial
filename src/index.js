@@ -15,7 +15,7 @@ function Square(props) {
 class Board extends React.Component {
     renderSquare(i) {
         return <Square
-            key = {i}
+            key={i}
             value={this.props.squares[i]}
             onClick={() => this.props.onClick(i)}
         />;
@@ -50,6 +50,7 @@ class Game extends React.Component {
             }],
             xIsNext: true,
             current_step: 0,
+            isAscendingSort: true,
         }
     }
 
@@ -115,7 +116,12 @@ class Game extends React.Component {
                 </div>
                 <div className="game-info">
                     <div>{status}</div>
-                    <ol>{history_move}</ol>
+                    <button
+                        onClick={() => this.setState({ isAscendingSort: !this.state.isAscendingSort })}
+                    >
+                        Reverse Sort
+                    </button>
+                    <ol>{this.state.isAscendingSort ? history_move : history_move.reverse()}</ol>
                 </div>
             </div>
         );
