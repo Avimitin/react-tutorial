@@ -94,9 +94,10 @@ class Game extends React.Component {
                 return `(${x}, ${y})`;
             };
             const desc = idx ? "Go to move: " + locate(hist.last_click) : "Go to beginning";
+            const text = idx === this.state.current_step ? (<b>{desc}</b>) : desc;
             return (
                 <li key={idx}>
-                    <button onClick={() => this.jumpTo(idx)}>{desc}</button>
+                    <button onClick={() => this.jumpTo(idx)}>{text}</button>
                 </li>
             )
         })
