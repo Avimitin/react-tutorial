@@ -4,7 +4,7 @@ import "./index.css";
 import { useState } from "react";
 
 // Calculate the winner line
-function calculateWinner(squares) {
+function calculateWinner(squares: Array<string | null>) {
   const lines = [
     [0, 1, 2],
     [3, 4, 5],
@@ -35,13 +35,20 @@ function Square({ value, highlight, onClick }) {
   );
 }
 
-function Board({ squares, winner_line, onClick }) {
-  const render_nth_square = (nth) => {
+type BoardProps = {
+  squares: Array<string | null>,
+  // an array contains the 3 index of the winner
+  winner: Array<number> | null,
+  onClick: (nth: number) => void;
+}
+
+function Board({ squares, winner, onClick }: BoardProps) {
+  const render_nth_square = (nth: number) => {
     return (
       <Square
         key={nth}
         value={squares[nth]}
-        highlight={winner_line !== null && winner_line.includes(nth)}
+        highlight={winner !== null && winner.includes(nth)}
         onClick={() => onClick(nth)} // transfer the `onClick` function from parent to `Square`
       />
     );
@@ -65,9 +72,11 @@ function Board({ squares, winner_line, onClick }) {
   return <div>{board}</div>;
 }
 
-function handle_click(history, nth, next_is_x) {
+// calculate necessary data update when the nth square was clicked
+function handle_board_click(nth: number, gd: GameDataLayout): GameDataLayout | null {
+  const history = gd.history;
   const current_gameboard = history[history.length - 1];
-  const square_values = current_gameboard.square_values.slice();
+  const square_values = current_gameboard.square.slice();
   // If we already have a winner, or the current square is clicked
   if (calculateWinner(square_values) || square_values[nth]) {
     // Update nothing and return
@@ -75,26 +84,35 @@ function handle_click(history, nth, next_is_x) {
   }
 
   // draw "X" or "O" based on state
-  square_values[nth] = next_is_x ? "X" : "O";
+  square_values[nth] = gd.next_is_x ? "X" : "O";
   return {
     history: history.concat([
-      { square_values: square_values, last_click: nth },
+      { square: square_values, last_click: nth },
     ]),
-    next_is_x: !next_is_x,
+    next_is_x: !gd.next_is_x,
     current_step: history.length,
   };
 }
 
-function handle_history_click(n) {
+// Handle the history buttons
+//
+// @param {number} n The number of the clicked history button
+function handle_history_click(n: number) {
   return {
     current_step: n,
     next_is_x: n % 2 === 0,
   };
 }
 
-function History({ history, current_step, setState, isAscSort }) {
-  const list_item = history.map((record, idx) => {
-    const locate = (idx) => {
+type HistoryProp = {
+  gd: GameDataLayout,
+  onClick: (new_data: GameDataLayout) => void
+  isAscSort: boolean,
+}
+
+function History({ gd, onClick, isAscSort }: HistoryProp) {
+  const list_item = gd.history.map((record, idx) => {
+    const locate = (idx: number) => {
       const x = (idx % 3).toFixed();
       const y = (idx / 3).toFixed();
       return `(${x}, ${y})`;
@@ -105,24 +123,36 @@ function History({ history, current_step, setState, isAscSort }) {
         ? "Go to move: " + locate(record.last_click)
         : "Go to beginning";
     // If current board is the one we choose in history, highlight it as bold text
-    const text = idx === current_step ? <b>{desc}</b> : desc;
+    const text = idx === gd.current_step ? <b>{desc}</b> : desc;
+
     return (
       <li key={idx}>
-        <button onClick={() => setState(handle_history_click(idx))}>
+        <button
+          onClick={() => {
+            const new_game_data = handle_history_click(idx);
+            onClick({ ...gd, ...new_game_data })
+          }}
+        >
           {text}
         </button>
       </li>
     );
   });
 
-  return isAscSort ? list_item : list_item.reverse();
+  return <ol>{isAscSort ? list_item : list_item.reverse()}</ol>;
 }
 
-function GameStatusText({ winner_line, gameboard, next_is_x }) {
-  let status_text;
-  if (winner_line !== null) {
-    status_text = "Winner: " + gameboard[winner_line[0]];
-  } else if (!gameboard.includes(null)) {
+type GameStatusTextProp = {
+  winner: Array<number> | null,
+  squares: Array<string | null>,
+  next_is_x: boolean,
+}
+
+function GameStatusText({ winner, squares, next_is_x }: GameStatusTextProp) {
+  let status_text: string;
+  if (winner !== null) {
+    status_text = "Winner: " + squares[winner[0]];
+  } else if (!squares.includes(null)) {
     // if winner line, and all the square in gameboard are filled up
     status_text = "No player win!";
   } else {
@@ -132,39 +162,55 @@ function GameStatusText({ winner_line, gameboard, next_is_x }) {
   return <div>{status_text}</div>;
 }
 
-function SortButton({ isAscSort, setSortOrder }) {
-  return <button onClick={() => setSortOrder(!isAscSort)}>Reverse Sort</button>;
+type SortButtonProps = {
+  isAscSort: boolean,
+  onClick: (new_sort: boolean) => void,
+}
+
+function SortButton({ isAscSort, onClick }: SortButtonProps) {
+  return <button onClick={() => onClick(!isAscSort)}>Reverse Sort</button>;
+}
+
+// Represent a single record of the history. Every square value
+// and the operation position were stored in this record.
+interface HistoryRecord {
+  square: Array<string | null>;
+  last_click: number;
+}
+
+interface GameDataLayout {
+  history: Array<HistoryRecord>;
+  next_is_x: boolean;
+  current_step: number;
+}
+
+const initGameData: GameDataLayout = {
+  history: [
+    {
+      square: Array(9).fill(null),
+      last_click: 0,
+    },
+  ],
+  next_is_x: true,
+  current_step: 0,
 }
 
 function Game() {
-  const [gameData, setGameData] = useState({
-    history: [
-      {
-        square_values: Array(9).fill(null),
-        last_click: 0,
-      },
-    ],
-    next_is_x: true,
-    current_step: 0,
-  });
+  const [gameData, setGameData] = useState(initGameData);
 
   const [isAscendingSort, setSortOrder] = useState(true);
 
   const current = gameData.history[gameData.current_step];
-  const winner = calculateWinner(current.square_values);
+  const winner = calculateWinner(current.square);
 
   return (
     <div className="game">
       <div className="game-board">
         <Board
-          squares={current.square_values}
-          winner_line={winner}
+          squares={current.square}
+          winner={winner}
           onClick={(nth) => {
-            const game_data = handle_click(
-              gameData.history,
-              nth,
-              gameData.next_is_x
-            );
+            const game_data = handle_board_click(nth, gameData);
             if (game_data === null) {
               return;
             }
@@ -174,16 +220,15 @@ function Game() {
       </div>
       <div className="game-info">
         <GameStatusText
-          winner_line={winner}
-          gameboard={current.square_values}
+          winner={winner}
+          squares={current.square}
           next_is_x={gameData.next_is_x}
         />
-        <SortButton isAscSort={isAscendingSort} setSortOrder={setSortOrder} />
+        <SortButton isAscSort={isAscendingSort} onClick={setSortOrder} />
         <ol>
           <History
-            history={gameData.history}
-            current_step={gameData.current_step}
-            setState={setGameData}
+            gd={gameData}
+            onClick={setGameData}
             isAscSort={isAscendingSort}
           />
         </ol>
